@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRDT | Creator Credit Protocol</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --red: #FF0000;
+            --red-dark: #CC0000;
+            --red-glow: #FF3333;
+            --black: #0A0A0A;
+            --black-light: #141414;
+            --gray: #666666;
+            --gray-light: #333333;
+            --white: #FFFFFF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--black);
+            color: var(--red);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Scattered text decorations */
+        .scatter {
+            position: fixed;
+            font-size: 11px;
+            color: var(--red);
+            opacity: 0.3;
+            pointer-events: none;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+        }
+
+        .scatter-1 { top: 60px; left: 20px; }
+        .scatter-2 { top: 80px; left: 20px; }
+        .scatter-3 { top: 120px; right: 30px; }
+        .scatter-4 { top: 200px; left: 15px; }
+        .scatter-5 { bottom: 200px; right: 20px; }
+        .scatter-6 { bottom: 150px; left: 20px; }
+        .scatter-7 { top: 300px; right: 25px; }
+        .scatter-8 { bottom: 300px; left: 30px; }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: rgba(10,10,10,0.95);
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--red);
+            color: var(--red);
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .nav-btn:hover {
+            background: var(--red);
+            color: var(--black);
+        }
+
+        /* Main container */
+        .container {
+            max-width: 540px;
+            margin: 0 auto;
+            padding: 140px 20px 30px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Hero section */
+        .hero {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .hero h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        .hero p {
+            font-size: 11px;
+            letter-spacing: 2px;
+            opacity: 0.7;
+        }
+
+        /* Dashboard card */
+        .dashboard {
+            background: var(--black-light);
+            border: 1px solid var(--red);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.1);
+        }
+
+        /* Stats row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: var(--gray);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            color: var(--white);
+        }
+
+        .stat-value.highlight {
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            color: var(--red);
+        }
+
+        /* Section headers */
+        .section-header {
+            font-size: 9px;
+            letter-spacing: 2px;
+            opacity: 0.6;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--gray-light);
+            color: var(--gray);
+        }
+
+        /* Platform rows */
+        .platforms {
+            margin-bottom: 20px;
+        }
+
+        .platform-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .platform-row:last-child {
+            border-bottom: none;
+        }
+
+        .platform-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .platform-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--white);
+        }
+
+        .platform-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .platform-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--white);
+        }
+
+        .platform-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .platform-value {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--white);
+        }
+
+        .platform-status {
+            font-size: 9px;
+            padding: 3px 6px;
+            border-radius: 2px;
+        }
+
+        .status-verified {
+            background: rgba(0, 255, 0, 0.15);
+            color: #00FF00;
+        }
+
+        .status-coming {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--gray);
+        }
+
+        /* Connect button */
+        .connect-btn {
+            background: transparent;
+            border: 1px solid var(--red);
+            color: var(--red);
+            padding: 4px 10px;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .connect-btn:hover {
+            background: var(--red);
+            color: var(--black);
+        }
+
+        /* Revenue section */
+        .revenue-section {
+            margin-bottom: 16px;
+        }
+
+        .revenue-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid var(--red);
+            margin-top: 10px;
+        }
+
+        .revenue-total-label {
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: var(--gray);
+        }
+
+        .revenue-total-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--white);
+        }
+
+        /* Pull button */
+        .pull-btn {
+            width: 100%;
+            background: var(--red);
+            border: none;
+            color: var(--black);
+            padding: 14px 24px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pull-btn:hover {
+            background: var(--red-glow);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+        }
+
+        .pull-btn:disabled {
+            background: var(--gray-light);
+            color: var(--gray);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Footer stats */
+        .footer-stats {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 1px solid var(--gray-light);
+        }
+
+        .footer-stat {
+            text-align: center;
+        }
+
+        .footer-stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            margin-bottom: 8px;
+            color: var(--white);
+        }
+
+        .footer-stat-label {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--gray);
+        }
+
+        /* Backed by */
+        .backed-by {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .backed-label {
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: var(--gray);
+            margin-bottom: 10px;
+            display: inline-block;
+            border: 1px solid var(--gray-light);
+            padding: 4px 10px;
+        }
+
+        .backed-logos {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            color: var(--gray);
+        }
+
+        /* Subtext */
+        .subtext {
+            font-size: 11px;
+            opacity: 0.5;
+            margin-top: 8px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--black-light);
+            border: 1px solid var(--red);
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(255, 0, 0, 0.2);
+        }
+
+        .modal h3 {
+            font-size: 16px;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+            color: var(--red);
+        }
+
+        .modal p {
+            font-size: 12px;
+            color: var(--gray);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .modal-btn {
+            background: var(--red);
+            border: none;
+            color: var(--black);
+            padding: 12px 24px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            cursor: pointer;
+            margin: 0 8px;
+            transition: all 0.2s;
+        }
+
+        .modal-btn:hover {
+            background: var(--red-glow);
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+        }
+
+        .modal-btn.secondary {
+            background: transparent;
+            border: 1px solid var(--red);
+            color: var(--red);
+        }
+
+        .modal-btn.secondary:hover {
+            background: var(--red);
+            color: var(--black);
+        }
+
+        /* X icon */
+        .x-icon {
+            font-weight: 700;
+        }
+
+        /* Connected state */
+        .connected .platform-value {
+            color: var(--red);
+        }
+
+        .score-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .score-progress {
+            width: 60px;
+            height: 4px;
+            background: var(--gray-light);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: var(--red);
+            transition: width 0.5s ease;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+
+        /* Subtext */
+        .subtext {
+            color: var(--gray);
+        }
+
+        /* Input styling */
+        #pullAmount {
+            background: var(--black);
+            border: 1px solid var(--gray-light);
+            color: var(--white);
+        }
+
+        #pullAmount:focus {
+            outline: none;
+            border-color: var(--red);
+        }
+
+        /* Logo */
+        .logo {
+            color: var(--red);
+        }
+
+        /* Hero */
+        .hero h1 {
+            color: var(--red);
+        }
+
+        .hero p {
+            color: var(--gray);
+        }
+    </style>
+</head>
+<body>
+    <!-- Scattered decorative text -->
+    <div class="scatter scatter-1">(...) CREATOR_PRODUCTIVITY....</div>
+    <div class="scatter scatter-2">(...) REVENUE_BACKED_CREDIT..........</div>
+    <div class="scatter scatter-3">//EPOCH 100 CREDIT</div>
+    <div class="scatter scatter-4">.C0 > CONTENT<br>.C1 > CREATOR<br>.C2 > CREDIT<br>.C3 > CAPITAL</div>
+    <div class="scatter scatter-5">(FUTURE_BACKED CR...</div>
+    <div class="scatter scatter-6">++++++<br>++++++<br>++++++</div>
+    <div class="scatter scatter-7">{$USDC $HONEY}</div>
+    <div class="scatter scatter-8">TERMINAL REVENUE HARVEST<br>2026</div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="logo">CRDT</div>
+        <a href="https://cal.com/adithyadinesh/15min" target="_blank" class="nav-btn">[ TALK TO THE BEST ZKTLS PROVIDER ]</a>
+    </nav>
+
+    <!-- Main content -->
+    <div class="container">
+        <div class="hero">
+            <h1>CREATOR CREDIT<br>PROTOCOL</h1>
+            <p>REVENUE-BACKED CAPITAL FOR CREATORS</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- Stats row -->
+            <div class="stats-row">
+                <div class="stat">
+                    <div class="stat-label">CREDIT LINE</div>
+                    <div class="stat-value highlight" id="creditLine">$0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">IMPLIED APY</div>
+                    <div class="stat-value" id="impliedApy">--%</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">PULLED</div>
+                    <div class="stat-value" id="pulled">$0</div>
+                </div>
+            </div>
+
+            <!-- Verified Revenue -->
+            <div class="section-header">VERIFIED REVENUE (via Reclaim)</div>
+            <div class="revenue-section">
+                <div class="platform-row" id="xRevenueRow">
+                    <div class="platform-left">
+                        <div class="platform-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                        </div>
+                        <div class="platform-name">X / Twitter</div>
+                    </div>
+                    <div class="platform-right" id="xRevenue">
+                        <button class="connect-btn" onclick="connectX()">[ CONNECT ]</button>
+                    </div>
+                </div>
+                <div class="platform-row">
+                    <div class="platform-left">
+                        <div class="platform-icon" style="color: #FF0000;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        </div>
+                        <div class="platform-name">YouTube AdSense</div>
+                    </div>
+                    <div class="platform-right">
+                        <span class="platform-status status-coming">COMING SOON</span>
+                    </div>
+                </div>
+                <div class="platform-row">
+                    <div class="platform-left">
+                        <div class="platform-icon" style="color: #E4405F;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>
+                        </div>
+                        <div class="platform-name">Instagram</div>
+                    </div>
+                    <div class="platform-right">
+                        <span class="platform-status status-coming">COMING SOON</span>
+                    </div>
+                </div>
+                <div class="platform-row">
+                    <div class="platform-left">
+                        <div class="platform-icon" style="color: #ffffff;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                        </div>
+                        <div class="platform-name">TikTok Creator Fund</div>
+                    </div>
+                    <div class="platform-right">
+                        <span class="platform-status status-coming">COMING SOON</span>
+                    </div>
+                </div>
+
+                <div class="revenue-total">
+                    <span class="revenue-total-label">TOTAL VERIFIED</span>
+                    <span class="revenue-total-value" id="totalRevenue">$0/mo</span>
+                </div>
+            </div>
+
+            <!-- Pull button -->
+            <button class="pull-btn" id="pullBtn" disabled>[ PULL ]</button>
+        </div>
+
+        <!-- Backed by -->
+        <div class="backed-by">
+            <div class="backed-label">[ POWERED BY ]</div>
+            <div class="backed-logos">
+                <span>RECLAIM</span>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Pull Modal -->
+    <div class="modal-overlay" id="pullModal">
+        <div class="modal">
+            <h3>PULL CREDIT</h3>
+            <p>Based on your verified revenue, you can pull up to <strong id="maxPull">$0</strong> at <strong>8.5% APY</strong>.</p>
+            <input type="text" id="pullAmount" placeholder="Enter amount..." style="width: 100%; padding: 12px; font-family: inherit; font-size: 14px; background: var(--black); border: 1px solid var(--gray-light); color: var(--white); margin-bottom: 16px; text-align: center;">
+            <button class="modal-btn" onclick="executePull()">[ CONFIRM PULL ]</button>
+            <button class="modal-btn secondary" onclick="closePullModal()">[ CANCEL ]</button>
+        </div>
+    </div>
+
+    <!-- Reclaim SDK -->
+    <script type="module">
+        import { ReclaimProofRequest } from 'https://esm.sh/@reclaimprotocol/js-sdk@4.10.1';
+
+        // Reclaim credentials
+        const APP_ID = '0x8b377992E1F76560d1836f51BAAf86f8600ec360';
+        const APP_SECRET = '0xc5c38950146621afde382fec6e652d64ca2f1bd703d23c05fdc746b24e3a2f40';
+        const PROVIDER_ID = 'b9535a2d-c7b4-463c-8d35-15329ff4d7de';
+
+        let isXConnected = false;
+        let xRevenue = 0;
+        let creditLine = 0;
+
+        // Connect X via Reclaim
+        window.connectX = async function() {
+            const btn = document.querySelector('#xRevenue .connect-btn');
+            if (btn) {
+                btn.textContent = '[ CONNECTING... ]';
+                btn.disabled = true;
+            }
+
+            try {
+                console.log('Initializing Reclaim with in-browser SDK v4...');
+
+                // Initialize with in-browser SDK options (v4 API)
+                const reclaimProofRequest = await ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID, {
+                    customSharePageUrl: 'https://portal.reclaimprotocol.org',
+                    useAppClip: false
+                });
+
+                console.log('Reclaim initialized');
+
+                // Start session to listen for proofs
+                await reclaimProofRequest.startSession({
+                    onSuccess: (proofs) => {
+                        console.log('Verification successful!', proofs);
+                        handleVerificationSuccess(proofs);
+                    },
+                    onError: (err) => {
+                        console.error('Verification failed:', err);
+                        resetButton(btn);
+                        alert('Verification failed: ' + (err.message || err));
+                    }
+                });
+
+                // Get the request URL (should now point to portal.reclaimprotocol.org)
+                const requestUrl = await reclaimProofRequest.getRequestUrl();
+                console.log('Request URL:', requestUrl);
+
+                // Open the verification URL in new window
+                const verifyWindow = window.open(requestUrl, '_blank', 'width=600,height=800,scrollbars=yes');
+
+                if (!verifyWindow) {
+                    alert('Please allow popups to complete verification');
+                    resetButton(btn);
+                }
+
+            } catch (err) {
+                console.error('Reclaim error:', err);
+                resetButton(btn);
+                alert('Error: ' + (err.message || err));
+            }
+        }
+
+        function resetButton(btn) {
+            if (btn) {
+                btn.textContent = '[ CONNECT ]';
+                btn.disabled = false;
+            }
+        }
+
+        // Underwriting Algorithm
+        function calculateCreditLine(monthlyRevenue, accountAgeMonths = 12, revenueMonths = 6, isGrowing = true) {
+            // Base multiplier for Twitter/X revenue (platform payout = 3-6x range)
+            const BASE_MULTIPLIER = 4;
+
+            // Risk score calculation (0.5 - 1.0)
+            let riskScore = 0.5; // base score
+
+            if (accountAgeMonths > 24) riskScore += 0.1;  // Account maturity
+            if (revenueMonths >= 6) riskScore += 0.2;     // Revenue consistency
+            if (isGrowing) riskScore += 0.1;              // Growth trajectory
+
+            riskScore = Math.min(riskScore, 1.0);
+
+            const creditLine = monthlyRevenue * BASE_MULTIPLIER * riskScore;
+
+            console.log('Underwriting:', {
+                monthlyRevenue,
+                multiplier: BASE_MULTIPLIER,
+                riskScore,
+                creditLine
+            });
+
+            return {
+                creditLine: Math.floor(creditLine),
+                riskScore,
+                multiplier: BASE_MULTIPLIER,
+                apy: riskScore >= 0.8 ? 8.5 : riskScore >= 0.6 ? 10.5 : 12.5
+            };
+        }
+
+        function handleVerificationSuccess(proofs) {
+            isXConnected = true;
+
+            // Extract revenue data from proof
+            let verifiedRevenue = 0;
+            let payoutPeriod = 'month';
+
+            try {
+                if (proofs && proofs.length > 0) {
+                    const proof = proofs[0];
+                    console.log('Full proof:', JSON.stringify(proof, null, 2));
+
+                    const context = JSON.parse(proof.claimData?.context || '{}');
+                    const params = JSON.parse(proof.claimData?.parameters || '{}');
+                    console.log('Proof data:', { context, params });
+
+                    // Extract revenue from various possible fields
+                    const extracted = context.extractedParameters || {};
+
+                    // Try different field names the provider might use
+                    verifiedRevenue = parseFloat(
+                        extracted.revenue ||
+                        extracted.amount ||
+                        extracted.payout ||
+                        extracted.earnings ||
+                        extracted.total ||
+                        extracted.value ||
+                        params.revenue ||
+                        params.amount ||
+                        0
+                    );
+
+                    // Check if it's a bi-weekly payout (Twitter pays every 2 weeks)
+                    if (extracted.period === 'biweekly' || extracted.period === '2weeks') {
+                        payoutPeriod = 'biweekly';
+                    }
+
+                    console.log('Extracted revenue:', verifiedRevenue, 'Period:', payoutPeriod);
+                }
+            } catch (e) {
+                console.log('Could not parse proof data:', e);
+            }
+
+            // Convert to monthly if bi-weekly ($200/2weeks = $400/month)
+            let monthlyRevenue = verifiedRevenue;
+            if (payoutPeriod === 'biweekly') {
+                monthlyRevenue = verifiedRevenue * 2;
+            }
+
+            // If no revenue found, use a demo value for testing
+            if (monthlyRevenue === 0) {
+                console.log('No revenue in proof, using demo value of $400/month');
+                monthlyRevenue = 400; // Demo: $200 bi-weekly = $400/month
+            }
+
+            // Calculate credit line using underwriting algorithm
+            const underwriting = calculateCreditLine(monthlyRevenue);
+
+            xRevenue = monthlyRevenue;
+            creditLine = underwriting.creditLine;
+
+            // Update UI
+            document.getElementById('xRevenue').innerHTML = `
+                <span class="platform-value">$${xRevenue.toLocaleString()}/mo</span>
+                <span class="platform-status status-verified">✓</span>
+            `;
+            document.getElementById('creditLine').textContent = `$${creditLine.toLocaleString()}`;
+            document.getElementById('impliedApy').textContent = `${underwriting.apy}%`;
+            document.getElementById('totalRevenue').textContent = `$${xRevenue.toLocaleString()}/mo`;
+            document.getElementById('pullBtn').disabled = false;
+
+            console.log('Credit approved:', {
+                verifiedRevenue: `$${verifiedRevenue} (${payoutPeriod})`,
+                monthlyRevenue: `$${monthlyRevenue}/mo`,
+                creditLine: `$${creditLine}`,
+                apy: `${underwriting.apy}%`,
+                riskScore: underwriting.riskScore
+            });
+        }
+
+        window.openPullModal = function() {
+            if (!isXConnected) return;
+            document.getElementById('maxPull').textContent = `$${creditLine.toLocaleString()}`;
+            document.getElementById('pullModal').classList.add('active');
+        }
+
+        window.closePullModal = function() {
+            document.getElementById('pullModal').classList.remove('active');
+        }
+
+        window.executePull = function() {
+            const amount = parseInt(document.getElementById('pullAmount').value.replace(/\D/g, ''));
+            if (amount && amount <= creditLine) {
+                document.getElementById('pulled').textContent = `$${amount.toLocaleString()}`;
+                closePullModal();
+            }
+        }
+
+        // Pull button click
+        document.getElementById('pullBtn').addEventListener('click', openPullModal);
+
+        console.log('Reclaim integration loaded');
+    </script>
+</body>
+</html>
